@@ -1,0 +1,105 @@
+<?php namespace ProcessWire;
+
+/**
+ * Action that toggles language status of a page
+ *
+ */
+
+class PageActionSetLanguageStatus extends PageAction implements Module {
+
+	public static function getModuleInfo() {
+		return [
+			'title' => __('Page Action: Set Language Status', __FILE__),
+			'summary' => __('Action that toggles the language status of a page.', __FILE__),
+			'version' => 1,
+			'author' => 'Philipp Daun',
+			'permission' => 'page-action-set-language-status',
+			'permissions' => ['page-action-set-language-status' => 'Page Action: Set Language Status']
+		];
+	}
+
+	public function __construct() {
+		parent::__construct();
+		$this->set('set_status_lang', '');
+		$this->set('set_status_value', '');
+		$this->status_labels = [
+			'' => '',
+			0 => $this->_('Inactive'),
+			1 => $this->_('Active')
+		];
+	}
+
+	/**
+	 * Apply action to page
+	 *
+	 * @param Page $item
+	 * @return bool
+	 *
+	 */
+	protected function ___action($item) {
+		$lang = (int) $this->set_status_lang;
+		$language = $this->wire()->languages->get($lang);
+		if (!$language || !$language->id || $language->isDefault) {
+			// unknown language or default
+			return false;
+		}
+
+		$status = (int) $this->set_status_value;
+		$statusLabel = $this->status_labels[$status] ?? null;
+		if (!$statusLabel) {
+			// unknown or unsupported status
+			return false;
+		}
+
+		$success = false;
+		$item->setAndSave("status$language", $status);
+		$this->message(
+			sprintf(
+				$this->_("Set language status of %s to '%s' for page: %s"),
+				$language->title,
+				$statusLabel,
+				$item->path
+			)
+		);
+		$success = true;
+
+		return $success;
+	}
+
+	/**
+	 * Configure
+	 *
+	 * @return InputfieldWrapper
+	 *
+	 */
+	public function ___getConfigInputfields() {
+		$languages = $this->wire()->languages->find('name!=default');
+
+		$fieldset = parent::___getConfigInputfields();
+		$fieldset->label = $this->_('Set Language Status');
+
+		/** @var  InputfieldSelect $f */
+		$f = $this->wire()->modules->get('InputfieldSelect');
+		$f->attr('name', 'set_status_lang');
+		$f->attr('value', $this->set_status_lang);
+		$f->label = $this->_('Language');
+		$f->columnWidth = 40;
+		foreach($languages as $language) {
+			$f->addOption($language->id, $language->title);
+		}
+		$fieldset->add($f);
+
+		/** @var  InputfieldSelect $f */
+		$f = $this->wire()->modules->get('InputfieldSelect');
+		$f->attr('name', 'set_status_value');
+		$f->attr('value', $this->set_status_value);
+		$f->label = $this->_('Status');
+		$f->columnWidth = 60;
+		foreach($this->status_labels as $status => $label) {
+			$f->addOption($status, $label);
+		}
+		$fieldset->add($f);
+
+		return $fieldset;
+	}
+}
